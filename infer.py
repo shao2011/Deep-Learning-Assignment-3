@@ -50,7 +50,7 @@ class UNetTestDataClass(Dataset):
     def __len__(self):
         return len(self.images_list)
 
-test_dataset = UNetTestDataClass(transforms.Compose([transforms.Resize((800, 1280))], transforms.PILToTensor()))
+test_dataset = UNetTestDataClass(transforms.Compose([transforms.Resize((800, 1280)), transforms.PILToTensor()]))
 test_dataloader = DataLoader(test_dataset,
                          batch_size = 8
                         )

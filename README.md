@@ -8,4 +8,9 @@ Bước 3: install các thư viện cần thiết.
 Bước 4: Chạy file `infer.py`.  
 `! python infer.py`  
 
-File `output.csv` sẽ được ghi ở folder `kaggle/working`.
+File `output.csv` sẽ được ghi ở folder `kaggle/working`.  
+Sau đây là code của 4 bước để copy & paste.  
+`! git clone https://github.com/shao2011/Deep-Learning-Assignment-3.git
+%cd Deep-Learning-Assignment-3
+! pip install -r requirements.txt
+! python infer.py`

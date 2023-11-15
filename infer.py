@@ -25,6 +25,7 @@ with zipfile.ZipFile("/kaggle/working/Deep-Learning-Assignment-3/save_model.zip"
 ### 4. Load model
 checkpoint = torch.load("/kaggle/working/save_model.pth")
 model.load_state_dict(checkpoint["model_state_dict"])
+model.to(device)
 
 ### 5. Infer
 class UNetTestDataClass(Dataset):

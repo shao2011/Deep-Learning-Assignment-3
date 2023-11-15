@@ -19,7 +19,7 @@ file_id = "1cJJaPqNKttI8lbSuTF7Z70m0uBHe4Gt0"
 gdown.download("http://drive.google.com/uc?/export=download&id="+file_id)
 
 ### 3. Giải nén
-with zipfile.ZipFile("/kaggle/working/save_model.zip", "r") as zip_ref:
+with zipfile.ZipFile("/kaggle/working/Deep-Learning-Assignment-3/save_model.zip", "r") as zip_ref:
     zip_ref.extractall("/kaggle/working")
 
 ### 4. Load model

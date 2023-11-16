@@ -15,7 +15,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model = smp.UnetPlusPlus(encoder_name="resnet34",encoder_weights="imagenet",in_channels = 3, classes = 3)
 
 ### 2. Tải file load model
-file_id = "1cJJaPqNKttI8lbSuTF7Z70m0uBHe4Gt0"
+file_id = "1As0E8-Ahsf3_AowJ8orgEX8f28ghxUg7"
 gdown.download("http://drive.google.com/uc?/export=download&id="+file_id)
 
 ### 3. Giải nén

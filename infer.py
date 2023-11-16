@@ -12,7 +12,7 @@ import cv2
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 ### 1. Tạo model
-model = smp.Unet(encoder_name="resnet34",encoder_weights="imagenet",in_channels = 3, classes = 3)
+model = smp.UnetPlusPlus(encoder_name="resnet34",encoder_weights="imagenet",in_channels = 3, classes = 3)
 
 ### 2. Tải file load model
 file_id = "1cJJaPqNKttI8lbSuTF7Z70m0uBHe4Gt0"
@@ -24,62 +24,47 @@ with zipfile.ZipFile("/kaggle/working/Deep-Learning-Assignment-3/save_model.zip"
 
 ### 4. Load model
 checkpoint = torch.load("/kaggle/working/save_model.pth")
-model.load_state_dict(checkpoint["model_state_dict"])
+model.load_state_dict(checkpoint["model"])
 model.to(device)
 
 ### 5. Infer
-class UNetTestDataClass(Dataset):
-    def __init__(self,  
-                 transform: transforms.Compose,
-                 images_path: str = "/kaggle/input/bkai-igh-neopolyp/test/test"):
-        super(UNetTestDataClass, self).__init__()
-        
-        images_list = os.listdir(images_path)
-        images_list = [images_path+"/"+i for i in images_list]
-        
-        self.images_list = images_list
-        self.transform = transform
-        
-    def __getitem__(self, index):
-        img_path = self.images_list[index]
-        data = Image.open(img_path)
-        h = data.size[1]
-        w = data.size[0]
-        data = self.transform(data) / 255        
-        return data, img_path, h, w
-    
-    def __len__(self):
-        return len(self.images_list)
+os.mkdir("kaggle/working/predicted_mask")
+color_dict= {0: (0, 0, 0),
+             1: (255, 0, 0),
+             2: (0, 255, 0)}
+def mask_to_rgb(mask, color_dict):
+    output = np.zeros((mask.shape[0], mask.shape[1], 3))
+#     print(output.shape)
+    for k in color_dict.keys():
+        output[mask==k] = color_dict[k]
 
-test_dataset = UNetTestDataClass(transforms.Compose([transforms.Resize((800, 1280)), transforms.PILToTensor()]))
-test_dataloader = DataLoader(test_dataset,
-                         batch_size = 8
-                        )
-
+    return np.uint8(output)    
 model.eval()
-if not os.path.isdir("/kaggle/working/predicted_masks"):
-    os.mkdir("/kaggle/working/predicted_masks")
-for _, (img, path, H, W) in enumerate(test_dataloader):
-    a = path
-    b = img
-    h = H
-    w = W
-    
+for i in os.listdir("/kaggle/input/bkai-igh-neopolyp/test/test"):
+    img_path = os.path.join("/kaggle/input/bkai-igh-neopolyp/test/test", i)
+    ori_img = cv2.imread(img_path)
+    ori_img = cv2.cvtColor(ori_img, cv2.COLOR_BGR2RGB)
+    ori_w = ori_img.shape[0]
+    ori_h = ori_img.shape[1]
+    img = cv2.resize(ori_img, (256, 256))
+    transformed = val_transform(image=img)
+    input_img = transformed["image"]
+    input_img = input_img.unsqueeze(0).to(device)
     with torch.no_grad():
-        predicted_mask = model(b.to(device))
-    for i in range(len(a)):
-        image_id = a[i].split('/')[-1].split('.')[0]
-        filename = image_id + ".png"
-        mask2img = transforms.Resize((h[i].item(), w[i].item()), interpolation=InterpolationMode.NEAREST)(transforms.ToPILImage()(torch.nn.functional.one_hot(torch.argmax(predicted_mask[i], 0)).permute(2, 0, 1).float()))
-        mask2img.save(os.path.join("/kaggle/working/predicted_masks/", filename))
-    
+        output_mask = model.forward(input_img).squeeze(0).cpu().numpy().transpose(1,2,0)
+    mask = cv2.resize(output_mask, (ori_h, ori_w))
+    mask = np.argmax(mask, axis=2)
+    new_rgb_mask = np.zeros((*mask.shape, 3)).astype(np.uint8)
+    mask_rgb = mask_to_rgb(mask, color_dict)
+    cv2.imwrite("predicted_mask/{}".format(i), mask_rgb)
 
 def rle_to_string(runs):
     return ' '.join(str(x) for x in runs)
 
 def rle_encode_one_mask(mask):
     pixels = mask.flatten()
-    pixels[pixels > 0] = 255
+    pixels[pixels > 225] = 255
+    pixels[pixels <= 225] = 0
     use_padding = False
     if pixels[0] or pixels[-1]:
         use_padding = True
@@ -92,6 +77,22 @@ def rle_encode_one_mask(mask):
         rle = rle - 1
     rle[1::2] = rle[1::2] - rle[:-1:2]
     return rle_to_string(rle)
+
+def rle2mask(mask_rle, shape=(3,3)):
+    '''
+    mask_rle: run-length as string formated (start length)
+    shape: (width,height) of array to return 
+    Returns numpy array, 1 - mask, 0 - background
+
+    '''
+    s = mask_rle.split()
+    starts, lengths = [np.asarray(x, dtype=int) for x in (s[0:][::2], s[1:][::2])]
+    starts -= 1
+    ends = starts + lengths
+    img = np.zeros(shape[0]*shape[1], dtype=np.uint8)
+    for lo, hi in zip(starts, ends):
+        img[lo:hi] = 1
+    return img.reshape(shape).T
 
 def mask2string(dir):
     ## mask --> string
@@ -117,10 +118,11 @@ def mask2string(dir):
     return r
 
 
-MASK_DIR_PATH = '/kaggle/working/predicted_masks' # change this to the path to your output mask folder
+MASK_DIR_PATH = '/kaggle/working/predicted_mask' # change this to the path to your output mask folder
 dir = MASK_DIR_PATH
 res = mask2string(dir)
 df = pd.DataFrame(columns=['Id', 'Expected'])
 df['Id'] = res['ids']
 df['Expected'] = res['strings']
-df.to_csv("/kaggle/working/output.csv", index=False)
+
+df.to_csv(r'output.csv', index=False)
